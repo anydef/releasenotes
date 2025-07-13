@@ -5,3 +5,12 @@ edition = "2024"
 
 [dependencies]
 octocrab = "0.44.1"
+clap = { version = "4.4.11", features = ["derive"] }
+git2 = "0.18.1"
+tokio = { version = "1.35.1", features = ["full"] }
+serde_json = "1.0.108"
+
+[dev-dependencies]
+mockito = "1.2.0"
+assert_cmd = "2.0.12"
+predicates = "3.0.4"
