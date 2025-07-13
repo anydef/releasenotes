@@ -2,6 +2,10 @@ use octocrab::Octocrab;
 use std::error::Error;
 use std::env;
 use std::process::Command;
+use std::path::Path;
+use anyhow::{Result, Context};
+use async_openai::{Client, config::OpenAIConfig};
+use fs_err as fs;
 
 pub async fn list_commits(
     octocrab: &Octocrab,
@@ -116,6 +120,55 @@ pub async fn list_commits(
             Ok(vec!["Could not find one or both of the specified commit references.".to_string()])
         }
     }
+}
+
+/// Generate release notes using an LLM based on commit messages and diff
+pub async fn generate_release_notes(commit_info: &[String], output_file: Option<&Path>) -> Result<String> {
+    // Read the system prompt
+    let system_prompt = fs::read_to_string("src/system_prompt.txt")
+        .context("Failed to read system prompt file")?;
+
+    // Prepare the user message (commit messages and diff)
+    let user_message = commit_info.join("\n");
+
+    // Save commit messages and diff to file if requested
+    if let Some(path) = output_file {
+        fs::write(path, &user_message)
+            .context("Failed to write commit info to file")?;
+    }
+
+    // Initialize the OpenAI client
+    let api_key = env::var("OPENAI_API_KEY")
+        .context("OPENAI_API_KEY environment variable not set")?;
+    let model = env::var("OPENAI_MODEL")
+        .context("OPENAI_MODEL environment variable not set")?;
+
+    let config = OpenAIConfig::new().with_api_key(api_key);
+    let client = Client::with_config(config);
+
+    // Generate release notes
+    use async_openai::types::{CreateChatCompletionRequest, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs};
+
+    let system_message = ChatCompletionRequestSystemMessageArgs::default()
+        .content(system_prompt)
+        .build()?;
+
+    let user_message = ChatCompletionRequestUserMessageArgs::default()
+        .content(user_message)
+        .build()?;
+
+    let request = CreateChatCompletionRequest {
+        model,
+        messages: vec![system_message.into(), user_message.into()],
+        ..Default::default()
+    };
+
+    let response = client.chat().create(request).await
+        .context("Failed to generate release notes")?;
+
+    let content = response.choices[0].message.content.clone().unwrap_or_default();
+
+    Ok(content)
 }
 
 #[cfg(test)]
