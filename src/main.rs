@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
+use dotenv::dotenv;
 use octocrab::Octocrab;
 use std::error::Error;
+use std::env;
 use releasenotes::list_commits;
 
 #[derive(Parser)]
@@ -34,11 +36,21 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    // Load environment variables from .env file
+    dotenv().ok();
+
     let cli = Cli::parse();
 
     match &cli.command {
         Commands::ListCommits { owner, repo, from, to } => {
-            let octocrab = Octocrab::builder().build()?;
+            // Get GitHub PAT from environment variables
+            let token = env::var("GH_PAT").expect("GH_PAT environment variable not set");
+
+            // Configure Octocrab with the GitHub PAT
+            let octocrab = Octocrab::builder()
+                .personal_token(token)
+                .build()?;
+
             let results = list_commits(&octocrab, owner, repo, from, to).await?;
             for line in results {
                 println!("{}", line);
