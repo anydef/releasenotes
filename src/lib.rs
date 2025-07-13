@@ -3,9 +3,37 @@ use std::error::Error;
 use std::env;
 use std::process::Command;
 use std::path::Path;
-use anyhow::{Result, Context};
+use anyhow::{Result, Context, anyhow};
 use async_openai::{Client, config::OpenAIConfig};
 use fs_err as fs;
+
+/// Resolve a reference (commit SHA or tag) to a commit SHA
+/// This function will try to find the commit SHA for a given reference
+/// If the reference is already a commit SHA, it will return it as is
+/// If the reference is a tag, it will try to find the corresponding commit SHA
+async fn resolve_reference(
+    octocrab: &Octocrab,
+    owner: &str,
+    repo: &str,
+    reference: &str,
+) -> Result<String, Box<dyn Error>> {
+    // Try to find the reference as a tag
+    let tags = octocrab
+        .repos(owner, repo)
+        .list_tags()
+        .per_page(100)
+        .send()
+        .await?;
+
+    for tag in tags.items {
+        if tag.name == reference {
+            return Ok(tag.commit.sha);
+        }
+    }
+
+    // If we couldn't find it as a tag, assume it's a commit SHA and return it as is
+    Ok(reference.to_string())
+}
 
 pub async fn list_commits(
     octocrab: &Octocrab,
@@ -14,6 +42,10 @@ pub async fn list_commits(
     from: &str,
     to: &str,
 ) -> Result<Vec<String>, Box<dyn Error>> {
+    // Resolve the from and to references to commit SHAs
+    let from_sha = resolve_reference(octocrab, owner, repo, from).await?;
+    let to_sha = resolve_reference(octocrab, owner, repo, to).await?;
+
     // Get commits for the repository
     let mut commits = Vec::new();
     let mut page = octocrab
@@ -33,8 +65,8 @@ pub async fn list_commits(
     }
 
     // Find the indices of the from and to commits
-    let from_index = commits.iter().position(|c| c.sha.starts_with(from) || c.sha == from);
-    let to_index = commits.iter().position(|c| c.sha.starts_with(to) || c.sha == to);
+    let from_index = commits.iter().position(|c| c.sha.starts_with(&from_sha) || c.sha == from_sha);
+    let to_index = commits.iter().position(|c| c.sha.starts_with(&to_sha) || c.sha == to_sha);
 
     match (from_index, to_index) {
         (Some(from_idx), Some(to_idx)) => {
@@ -46,7 +78,9 @@ pub async fn list_commits(
             };
 
             let mut result = Vec::new();
-            result.push(format!("Commits between {} and {}:", from, to));
+            // Include original references in the output for clarity
+            result.push(format!("Commits between {} ({}) and {} ({}):", 
+                from, from_sha, to, to_sha));
 
             // Collect commit messages for each commit in the range
             for commit in &commits[start..=end] {
@@ -69,7 +103,8 @@ pub async fn list_commits(
                 owner, repo, base_sha, head_sha
             );
 
-            result.push(format!("\nDiff between {} and {}:", head_sha, base_sha));
+            result.push(format!("\nDiff between {} ({}) and {} ({}):", 
+                from, head_sha, to, base_sha));
 
             // Run the curl command to get the diff for the entire range
             let output = match Command::new("curl")

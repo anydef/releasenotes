@@ -26,20 +26,24 @@ LLM Rag to summarize and generate release notes from GitHub issues and pull requ
 Lists all commit messages between two commit IDs or tags:
 
 ```bash
-cargo run -- list-commits -o OWNER -r REPO -f FROM_COMMIT -t TO_COMMIT
+cargo run -- list-commits -o OWNER -r REPO -f FROM_REFERENCE -t TO_REFERENCE
 ```
+
+Where `FROM_REFERENCE` and `TO_REFERENCE` can be either commit IDs or git tags.
 
 
 ### Generate Release Notes
 Generates release notes using an LLM based on commit messages:
 
 ```bash
-cargo run -- generate-release-notes -o OWNER -r REPO -f FROM_COMMIT -t TO_COMMIT [-u OUTPUT_FILE]
+cargo run -- generate-release-notes -o OWNER -r REPO -f FROM_REFERENCE -t TO_REFERENCE [-u OUTPUT_FILE]
 ```
+
+Where `FROM_REFERENCE` and `TO_REFERENCE` can be either commit IDs or git tags.
 
 Parameters:
 - `-o, --owner`: GitHub repository owner
 - `-r, --repo`: GitHub repository name
-- `-f, --from`: Starting commit ID or tag
-- `-t, --to`: Ending commit ID or tag
+- `-f, --from`: Starting reference (commit ID or git tag)
+- `-t, --to`: Ending reference (commit ID or git tag)
 - `-u, --output-file`: Optional file to save commit messages and diff
