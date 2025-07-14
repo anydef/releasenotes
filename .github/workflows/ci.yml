@@ -1,0 +1,113 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu]
+        include:
+          - target: x86_64-unknown-linux-gnu
+            arch: amd64
+          - target: aarch64-unknown-linux-gnu
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      - name: Install cross-compilation tools
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Run tests
+        run: cross test --target ${{ matrix.target }}
+
+      - name: Set binary name
+        run: echo "BINARY_NAME=releasenotes" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Set artifact name
+        run: echo "ARTIFACT_NAME=releasenotes-${{ matrix.arch }}" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Upload build artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
+          retention-days: 1
+
+  release:
+    needs: build-and-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create release directory
+        run: mkdir -p release
+
+      - name: Download amd64 artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: releasenotes-amd64
+          path: ./release/amd64
+
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: releasenotes-arm64
+          path: ./release/arm64
+
+      - name: Rename binaries with architecture suffix
+        run: |
+          mv ./release/amd64/releasenotes ./release/releasenotes-linux-amd64
+          mv ./release/arm64/releasenotes ./release/releasenotes-linux-arm64
+          chmod +x ./release/releasenotes-linux-amd64 ./release/releasenotes-linux-arm64
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            ./release/releasenotes-linux-amd64
+            ./release/releasenotes-linux-arm64
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

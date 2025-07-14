@@ -3,6 +3,13 @@ LLM Rag to summarize and generate release notes from GitHub issues and pull requ
 
 *This is a 100% vibe-coded project. Use at your own risk.*
 
+## CI/CD Pipeline
+This project uses GitHub Actions for continuous integration and deployment. The pipeline:
+- Builds and tests the project for both amd64 and arm64 architectures
+- Publishes executables to GitHub releases when a new tag is pushed
+
+Pre-built binaries are available for Linux (amd64 and arm64) in the GitHub releases section.
+
 # How to use:
 
 ## Prerequisites
