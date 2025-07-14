@@ -18,7 +18,7 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             arch: arm64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload build artifact
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
@@ -77,13 +77,13 @@ jobs:
         run: mkdir -p release
 
       - name: Download amd64 artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: releasenotes-amd64
           path: ./release/amd64
 
       - name: Download arm64 artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: releasenotes-arm64
           path: ./release/arm64
