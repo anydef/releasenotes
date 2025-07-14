@@ -82,10 +82,11 @@ pub async fn list_commits(
             result.push(format!("Commits between {} ({}) and {} ({}):", 
                 from, from_sha, to, to_sha));
 
-            // Collect commit messages for each commit in the range
+            // Collect commit messages and authors for each commit in the range
             for commit in &commits[start..=end] {
                 let message = commit.commit.message.lines().next().unwrap_or("No message");
-                result.push(format!("- {}: {}", commit.sha, message));
+                let author = commit.author.as_ref().map_or("Unknown", |a| a.login.as_str());
+                result.push(format!("- {} by {}: {}", commit.sha, author, message));
             }
 
             // Get the GitHub PAT from environment variables

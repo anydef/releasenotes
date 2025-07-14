@@ -33,7 +33,7 @@ Where `FROM_REFERENCE` and `TO_REFERENCE` can be either commit IDs or git tags.
 
 
 ### Generate Release Notes
-Generates release notes using an LLM based on commit messages:
+Generates release notes using an LLM based on commit messages and author information:
 
 ```bash
 cargo run -- generate-release-notes -o OWNER -r REPO -f FROM_REFERENCE -t TO_REFERENCE [-u OUTPUT_FILE]
